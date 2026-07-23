@@ -4,33 +4,41 @@ from config_settings import COLOR_FAST_SPIKE, COLOR_SLOW_SMOOTH, COLOR_HISTORICA
 
 def render_panel_chart(df, pred_fast, pred_slow, title):
     """
-    Renders an individual indicator forecast panel in compact dark mode for 1-screen viewing.
+    Renders an individual indicator forecast panel in an ultra-compact
+    layout (very wide, very short) to ensure all 3 rows fit one screen.
     """
-    # Reduced size to fit all 9 panels on one display without scrolling
-    fig, ax = plt.subplots(figsize=(3.8, 2.0), facecolor=COLOR_BG)
+    # ULTRA COMPACT SIZE: Ratio adjusted for 3x3 stacking
+    fig, ax = plt.subplots(figsize=(4.0, 1.2), facecolor=COLOR_BG)
     ax.set_facecolor(COLOR_BG)
     
     # Historical Prices
-    ax.plot(range(len(df)), df['Close'], color=COLOR_HISTORICAL, linewidth=1.0, label="History")
+    ax.plot(range(len(df)), df['Close'], color=COLOR_HISTORICAL, linewidth=1.0)
     
-    # Build complete forecast lines starting from the last historical point
+    # Complete forecast lines starting from the last historical point
     full_fast = np.insert(pred_fast, 0, df['Close'].iloc[-1])
     full_slow = np.insert(pred_slow, 0, df['Close'].iloc[-1])
-    
-    # Future x-coordinates matching full_fast & full_slow length
     future_x = range(len(df) - 1, len(df) + len(pred_fast))
     
-    # Yellow Spike Line
-    ax.plot(future_x, full_fast, color=COLOR_FAST_SPIKE, linewidth=1.8, label="Spike (Fast)")
+    # Yellow Spike Line (Thinner)
+    ax.plot(future_x, full_fast, color=COLOR_FAST_SPIKE, linewidth=1.5)
     
-    # Blue Smooth Line
-    ax.plot(future_x, full_slow, color=COLOR_SLOW_SMOOTH, linewidth=2.0, linestyle="--", label="Smooth (Trend)")
+    # Blue Smooth Line (Thinner)
+    ax.plot(future_x, full_slow, color=COLOR_SLOW_SMOOTH, linewidth=1.8, linestyle="--")
     
-    ax.set_title(title, fontsize=8, fontweight='bold', color='#FFFFFF', pad=4)
-    ax.grid(True, linestyle=':', alpha=0.15, color='#FFFFFF')
-    ax.tick_params(colors='#888888', labelsize=6)
-    for spine in ax.spines.values():
-        spine.set_color('#333333')
-        
-    plt.tight_layout()
+    # ULTRA COMPACT TEXT AND GRIDS
+    ax.set_title(title, fontsize=7, fontweight='bold', color='#FFFFFF', pad=2)
+    ax.grid(True, linestyle=':', alpha=0.1, color='#FFFFFF')
+    
+    # Shrink and dim the ticks
+    ax.tick_params(colors='#666666', labelsize=5, length=1, pad=1)
+    
+    # Hide top and right spines completely for a cleaner look
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_color('#333333')
+    ax.spines['bottom'].set_color('#333333')
+    
+    # Reduce whitespace around the plot within the figure
+    plt.subplots_adjust(left=0.08, bottom=0.1, right=0.98, top=0.85, wspace=0, hspace=0)
+    
     return fig
