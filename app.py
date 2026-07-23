@@ -116,7 +116,7 @@ try:
         fig = render_panel_chart(df, pred_fast, pred_slow, title)
         
         with col:
-            st.pyplot(fig, use_container_width=True)
+         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
 except Exception as e:
     st.error(f"Error loading live market data: {e}")
