@@ -12,15 +12,17 @@ def render_panel_chart(df, pred_fast, pred_slow, title):
     # Historical Prices
     ax.plot(range(len(df)), df['Close'], color=COLOR_HISTORICAL, linewidth=1.2, label="History")
     
-    # Forecast Lines
-    future_x = range(len(df) - 1, len(df) - 1 + len(pred_fast))
+    # Build complete forecast lines starting from the last historical point
+    full_fast = np.insert(pred_fast, 0, df['Close'].iloc[-1])
+    full_slow = np.insert(pred_slow, 0, df['Close'].iloc[-1])
+    
+    # Future x-coordinates matching full_fast & full_slow length
+    future_x = range(len(df) - 1, len(df) + len(pred_fast))
     
     # Yellow Spike Line
-    full_fast = np.insert(pred_fast, 0, df['Close'].iloc[-1])
     ax.plot(future_x, full_fast, color=COLOR_FAST_SPIKE, linewidth=2.2, label="Spike (Fast)")
     
     # Blue Smooth Line
-    full_slow = np.insert(pred_slow, 0, df['Close'].iloc[-1])
     ax.plot(future_x, full_slow, color=COLOR_SLOW_SMOOTH, linewidth=2.5, linestyle="--", label="Smooth (Trend)")
     
     ax.set_title(title, fontsize=10, fontweight='bold', color='#FFFFFF', pad=8)
