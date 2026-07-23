@@ -6,7 +6,7 @@ def render_panel_chart(df, pred_fast, pred_slow, title):
     """
     Renders an individual indicator forecast panel in proper aspect ratio.
     """
-    fig, ax = plt.subplots(figsize=(4.0, 2.2), facecolor=COLOR_BG)
+   fig, ax = plt.subplots(figsize=(4.0, 1.6), facecolor=COLOR_BG)
     ax.set_facecolor(COLOR_BG)
     
     # Historical Prices
