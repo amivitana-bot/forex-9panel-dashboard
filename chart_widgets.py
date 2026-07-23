@@ -1,44 +1,109 @@
-import matplotlib.pyplot as plt
+import streamlit as st
+import pandas as pd
+import yfinance as yf
 import numpy as np
-from config_settings import COLOR_FAST_SPIKE, COLOR_SLOW_SMOOTH, COLOR_HISTORICAL, COLOR_BG
 
-def render_panel_chart(df, pred_fast, pred_slow, title):
-    """
-    Renders an individual indicator forecast panel in an ultra-compact
-    layout (very wide, very short) to ensure all 3 rows fit one screen.
-    """
-    # ULTRA COMPACT SIZE: Ratio adjusted for 3x3 stacking
-    fig, ax = plt.subplots(figsize=(4.0, 1.2), facecolor=COLOR_BG)
-    ax.set_facecolor(COLOR_BG)
+from core_predictor import generate_dual_forecast
+from chart_widgets import render_panel_chart
+
+# 1. Page Config for Full-Screen Grid View
+st.set_page_config(
+    page_title="Forex Confirmation Matrix",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
+# Ultra-tight padding so charts take over the screen
+st.markdown("""
+    <style>
+    .block-container {
+        padding-top: 0.5rem !important;
+        padding-bottom: 0rem !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    div[data-testid="stVerticalBlock"] > div {
+        gap: 0.2rem !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# 2. Controls Section (Single Row Layout)
+col_title, col_pair, col_tf, col_btn = st.columns([2, 1.5, 1.5, 1])
+
+with col_title:
+    st.markdown("<h3 style='margin:0; padding:0; color:#FFFFFF;'>⚡ Forex Matrix</h3>", unsafe_allow_html=True)
+
+with col_pair:
+    symbol = st.selectbox("Pair", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X"], index=0, label_visibility="collapsed")
+
+with col_tf:
+    timeframe = st.selectbox("TF", ["15m", "30m", "1h", "4h"], index=0, label_visibility="collapsed")
+
+with col_btn:
+    refresh = st.button("🔄 Refresh")
+
+# Map timeframe choices to yfinance parameters
+tf_config = {
+    "15m": {"interval": "15m", "period": "5d"},
+    "30m": {"interval": "30m", "period": "5d"},
+    "1h":  {"interval": "1h",  "period": "1mo"},
+    "4h":  {"interval": "1h",  "period": "3mo"}
+}
+
+# 3. Load Market Data
+@st.cache_data(ttl=60)
+def fetch_data(ticker, tf):
+    cfg = tf_config[tf]
+    data = yf.download(ticker, period=cfg["period"], interval=cfg["interval"], progress=False)
     
-    # Historical Prices
-    ax.plot(range(len(df)), df['Close'], color=COLOR_HISTORICAL, linewidth=1.0)
+    if data.empty:
+        raise ValueError(f"No data returned for {ticker} on {tf} timeframe.")
+
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(0)
+
+    required_cols = ['Open', 'High', 'Low', 'Close']
+    data = data[required_cols].dropna().copy()
     
-    # Complete forecast lines starting from the last historical point
-    full_fast = np.insert(pred_fast, 0, df['Close'].iloc[-1])
-    full_slow = np.insert(pred_slow, 0, df['Close'].iloc[-1])
-    future_x = range(len(df) - 1, len(df) + len(pred_fast))
+    if tf == "4h":
+        data = data.resample('4h').agg({
+            'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last'
+        }).dropna()
+
+    return data.tail(60)
+
+try:
+    df = fetch_data(symbol, timeframe)
+
+    indicators = [
+        ("Moving Averages", "MA"),
+        ("Fibonacci Retracement", "FIB"),
+        ("RSI Momentum", "RSI"),
+        ("Bollinger Bands", "BOLL"),
+        ("MACD Oscillator", "MACD"),
+        ("Supertrend Indicator", "SUPERTREND"),
+        ("Ichimoku Cloud", "ICHIMOKU"),
+        ("ADX Trend Strength", "ADX"),
+        ("Parabolic SAR", "PSAR")
+    ]
+
+    # 4. Render 3x3 Grid Matrix
+    row1 = st.columns(3)
+    row2 = st.columns(3)
+    row3 = st.columns(3)
     
-    # Yellow Spike Line (Thinner)
-    ax.plot(future_x, full_fast, color=COLOR_FAST_SPIKE, linewidth=1.5)
-    
-    # Blue Smooth Line (Thinner)
-    ax.plot(future_x, full_slow, color=COLOR_SLOW_SMOOTH, linewidth=1.8, linestyle="--")
-    
-    # ULTRA COMPACT TEXT AND GRIDS
-    ax.set_title(title, fontsize=7, fontweight='bold', color='#FFFFFF', pad=2)
-    ax.grid(True, linestyle=':', alpha=0.1, color='#FFFFFF')
-    
-    # Shrink and dim the ticks
-    ax.tick_params(colors='#666666', labelsize=5, length=1, pad=1)
-    
-    # Hide top and right spines completely for a cleaner look
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_color('#333333')
-    ax.spines['bottom'].set_color('#333333')
-    
-    # Reduce whitespace around the plot within the figure
-    plt.subplots_adjust(left=0.08, bottom=0.1, right=0.98, top=0.85, wspace=0, hspace=0)
-    
-    return fig
+    grid = [row1, row2, row3]
+
+    for idx, (title, code) in enumerate(indicators):
+        col = grid[idx // 3][idx % 3]
+        pred_fast, pred_slow = generate_dual_forecast(df, code)
+        fig = render_panel_chart(df, pred_fast, pred_slow, title)
+        
+        with col:
+            st.pyplot(fig, use_container_width=True)
+
+except Exception as e:
+    st.error(f"Error loading live market data: {e}")
