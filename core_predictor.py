@@ -6,39 +6,48 @@ from config_settings import FAST_LOOKBACK, SLOW_LOOKBACK, FORECAST_STEPS
 def generate_dual_forecast(df, indicator_type):
     """
     Calculates both Fast (Spike/Yellow) and Slow (Smooth/Blue) 4-candle projections 
-    independently for a given indicator slot.
+    independently for a given indicator slot, with clean NaN handling.
     """
-    close_prices = df['Close'].values
+    # Clean missing data
+    df_clean = df.dropna().copy()
+    close_prices = df_clean['Close'].values
     n = len(close_prices)
+    
+    if n < SLOW_LOOKBACK:
+        # Fallback if not enough data samples exist
+        return np.array([close_prices[-1]]*FORECAST_STEPS), np.array([close_prices[-1]]*FORECAST_STEPS)
     
     # Feature extraction based on indicator logic
     if indicator_type == "MA":
-        feat = (df['Close'].ewm(span=20).mean() - df['Close'].rolling(20).mean()).fillna(0).values
+        feat = (df_clean['Close'].ewm(span=20).mean() - df_clean['Close'].rolling(20).mean()).fillna(0).values
     elif indicator_type == "FIB":
-        high, low = df['High'].max(), df['Low'].min()
-        feat = (df['Close'] - (high - 0.618 * (high - low))).values
+        high, low = df_clean['High'].max(), df_clean['Low'].min()
+        feat = (df_clean['Close'] - (high - 0.618 * (high - low))).values
     elif indicator_type == "RSI":
-        delta = df['Close'].diff()
+        delta = df_clean['Close'].diff()
         gain = (delta.where(delta > 0, 0)).rolling(14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
         feat = (100 - (100 / (1 + (gain / (loss + 1e-9))))).fillna(50).values
     elif indicator_type == "BOLL":
-        sma = df['Close'].rolling(20).mean()
-        std = df['Close'].rolling(20).std()
-        feat = ((df['Close'] - (sma - std*2)) / ((sma + std*2) - (sma - std*2) + 1e-9)).fillna(0.5).values
+        sma = df_clean['Close'].rolling(20).mean()
+        std = df_clean['Close'].rolling(20).std()
+        feat = ((df_clean['Close'] - (sma - std*2)) / ((sma + std*2) - (sma - std*2) + 1e-9)).fillna(0.5).values
     elif indicator_type == "MACD":
-        feat = ((df['Close'].ewm(span=12).mean() - df['Close'].ewm(span=26).mean()) - (df['Close'].ewm(span=12).mean() - df['Close'].ewm(span=26).mean()).ewm(span=9).mean()).fillna(0).values
+        feat = ((df_clean['Close'].ewm(span=12).mean() - df_clean['Close'].ewm(span=26).mean()) - (df_clean['Close'].ewm(span=12).mean() - df_clean['Close'].ewm(span=26).mean()).ewm(span=9).mean()).fillna(0).values
     elif indicator_type == "SUPERTREND":
-        tr = np.maximum(df['High'] - df['Low'], np.abs(df['High'] - df['Close'].shift(1)))
-        feat = ((df['High'] + df['Low'])/2 - 3 * pd.Series(tr).rolling(10).mean().fillna(0)).values
+        tr = np.maximum(df_clean['High'] - df_clean['Low'], np.abs(df_clean['High'] - df_clean['Close'].shift(1)))
+        feat = ((df_clean['High'] + df_clean['Low'])/2 - 3 * pd.Series(tr).rolling(10).mean().fillna(0)).values
     elif indicator_type == "ICHIMOKU":
-        feat = (((df['High'].rolling(9).max() + df['Low'].rolling(9).min())/2) - ((df['High'].rolling(26).max() + df['Low'].rolling(26).min())/2)).fillna(0).values
+        feat = (((df_clean['High'].rolling(9).max() + df_clean['Low'].rolling(9).min())/2) - ((df_clean['High'].rolling(26).max() + df_clean['Low'].rolling(26).min())/2)).fillna(0).values
     elif indicator_type == "ADX":
-        feat = df['Close'].pct_change().abs().rolling(14).mean().fillna(0).values
+        feat = df_clean['Close'].pct_change().abs().rolling(14).mean().fillna(0).values
     elif indicator_type == "PSAR":
-        feat = (df['High'] - df['Low']).values
+        feat = (df_clean['High'] - df_clean['Low']).values
     else:
         feat = np.zeros(n)
+
+    # Ensure no NaN or Inf remains in features
+    feat = np.nan_to_num(feat, nan=0.0, posinf=0.0, neginf=0.0)
 
     X = np.arange(n).reshape(-1, 1)
     
