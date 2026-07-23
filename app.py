@@ -46,23 +46,44 @@ with col_btn:
     st.write("") 
     refresh = st.button("🔄 Refresh Data")
 
-# Map timeframe choices to yfinance interval codes
-tf_map = {
-    "15m": "15m",
-    "30m": "30m",
-    "1h": "1h",
-    "4h": "1h" # 4h simulated via resample/1h base
+# Map timeframe choices to yfinance interval & period parameters
+tf_config = {
+    "15m": {"interval": "15m", "period": "5d"},
+    "30m": {"interval": "30m", "period": "5d"},
+    "1h":  {"interval": "1h",  "period": "1mo"},
+    "4h":  {"interval": "1h",  "period": "3mo"}  # Resampled if needed
 }
 
 # 3. Load Market Data
 @st.cache_data(ttl=60)
 def fetch_data(ticker, tf):
-    interval = tf_map[tf]
-    period = "1mo" if interval in ["15m", "30m"] else "6mo"
-    data = yf.download(ticker, period=period, interval=interval)
+    cfg = tf_config[tf]
+    data = yf.download(ticker, period=cfg["period"], interval=cfg["interval"], progress=False)
+    
+    if data.empty:
+        raise ValueError(f"No data returned for {ticker} on {tf} timeframe.")
+
+    # Flatten MultiIndex columns if present
     if isinstance(data.columns, pd.MultiIndex):
         data.columns = data.columns.get_level_values(0)
-    data = data.dropna()
+
+    # Ensure required columns exist
+    required_cols = ['Open', 'High', 'Low', 'Close']
+    for col in required_cols:
+        if col not in data.columns:
+            raise ValueError(f"Missing column '{col}' from market data feed.")
+
+    data = data[required_cols].dropna().copy()
+    
+    # Resample 1h to 4h if 4h requested
+    if tf == "4h":
+        data = data.resample('4h').agg({
+            'Open': 'first',
+            'High': 'max',
+            'Low': 'min',
+            'Close': 'last'
+        }).dropna()
+
     return data.tail(60)
 
 try:
