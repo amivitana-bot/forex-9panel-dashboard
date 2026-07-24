@@ -2,11 +2,13 @@ import plotly.graph_objects as go
 import numpy as np
 from config_settings import COLOR_FAST_SPIKE, COLOR_SLOW_SMOOTH, COLOR_HISTORICAL, COLOR_BG
 
-def render_panel_chart(df, pred_fast, pred_slow, title):
+def render_panel_chart(df, pred_fast, pred_slow, title, show_crosshair=False):
     """
-    Renders an interactive Plotly chart with crosshairs and exact hover numbers.
+    Renders an interactive Plotly chart with optional crosshairs.
     """
     fig = go.Figure()
+
+    hover_mode_setting = "x" if show_crosshair else False
 
     # 1. Historical Prices
     fig.add_trace(go.Scatter(
@@ -15,7 +17,8 @@ def render_panel_chart(df, pred_fast, pred_slow, title):
         mode='lines',
         name='History',
         line=dict(color=COLOR_HISTORICAL, width=1.2),
-        hovertemplate='Index: %{x}<br>Price: %{y:.5f}<extra></extra>'
+        hoverinfo='all' if show_crosshair else 'skip',
+        hovertemplate='Candle: %{x}<br>Price: %{y:.5f}<extra></extra>' if show_crosshair else None
     ))
 
     # Forecast coordinates
@@ -30,7 +33,8 @@ def render_panel_chart(df, pred_fast, pred_slow, title):
         mode='lines',
         name='Fast Spike',
         line=dict(color=COLOR_FAST_SPIKE, width=2),
-        hovertemplate='Fast Pred: %{y:.5f}<extra></extra>'
+        hoverinfo='all' if show_crosshair else 'skip',
+        hovertemplate='Fast Pred: %{y:.5f}<extra></extra>' if show_crosshair else None
     ))
 
     # 3. Slow Blue Smooth Line
@@ -40,10 +44,11 @@ def render_panel_chart(df, pred_fast, pred_slow, title):
         mode='lines',
         name='Slow Trend',
         line=dict(color=COLOR_SLOW_SMOOTH, width=2, dash='dash'),
-        hovertemplate='Slow Pred: %{y:.5f}<extra></extra>'
+        hoverinfo='all' if show_crosshair else 'skip',
+        hovertemplate='Slow Pred: %{y:.5f}<extra></extra>' if show_crosshair else None
     ))
 
-    # 4. Interactive Layout Settings with Crosshair Cursor
+    # 4. Interactive Layout with Dynamic Crosshair Control
     fig.update_layout(
         title=dict(text=f"<b>{title}</b>", font=dict(size=12, color="white"), y=0.95),
         paper_bgcolor=COLOR_BG,
@@ -51,18 +56,23 @@ def render_panel_chart(df, pred_fast, pred_slow, title):
         margin=dict(l=5, r=5, t=25, b=5),
         height=180,
         showlegend=False,
-        hovermode="x unified",  # Displays exact prices across lines on hover
-        xaxis=dict(
-            showgrid=True, gridcolor='#222222',
-            showticklabels=False,
-            spikethickness=1, spikedash='dot', spikecolor='#888888', spikemode='across' # Vertical crosshair line
-        ),
-        yaxis=dict(
-            showgrid=True, gridcolor='#222222',
-            tickfont=dict(color='#888888', size=8),
-            side="right",
-            spikethickness=1, spikedash='dot', spikecolor='#888888', spikemode='across' # Horizontal crosshair line
-        )
+        hovermode=hover_mode_setting,
+        hoverdistance=-1 if show_crosshair else 0,
+    )
+
+    # Configure axes spikelines based on toggle switch
+    fig.update_xaxes(
+        showgrid=True, gridcolor='#222222',
+        showticklabels=False,
+        showspikes=show_crosshair, spikemode='across', spikesnap='cursor',
+        spikethickness=1, spikedash='dot', spikecolor='#AAAAAA'
+    )
+    fig.update_yaxes(
+        showgrid=True, gridcolor='#222222',
+        tickfont=dict(color='#888888', size=8),
+        side="right",
+        showspikes=show_crosshair, spikemode='across', spikesnap='cursor',
+        spikethickness=1, spikedash='dot', spikecolor='#AAAAAA'
     )
 
     return fig
