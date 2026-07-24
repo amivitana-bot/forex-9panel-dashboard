@@ -23,7 +23,13 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Web Audio API Alarm
+# 1. Initialize Active Pair State
+pair_list = ["USDJPY=X", "EURJPY=X", "GBPJPY=X", "AUDJPY=X", "EURUSD=X", "GBPUSD=X", "AUDUSD=X", "USDCAD=X"]
+
+if "selected_pair" not in st.session_state:
+    st.session_state["selected_pair"] = "USDJPY=X"
+
+# Web Audio API Escalating Alarm Component
 def trigger_escalating_alarm(active, test_mode=False):
     if active:
         max_beeps = 5 if test_mode else 999
@@ -87,16 +93,21 @@ def fetch_data(ticker, tf):
 
     return data.tail(60)
 
-# Pair list prioritized with JPY Majors first
-pair_list = ["USDJPY=X", "EURJPY=X", "GBPJPY=X", "AUDJPY=X", "EURUSD=X", "GBPUSD=X", "AUDUSD=X", "USDCAD=X"]
-
+# Main Split Screen Layout
 col_left, col_right = st.columns([1.3, 1])
 
-# --- RIGHT SIDE: CONTROLS, JPY PRIORITY CHART & MULTI-PAIR FEED ---
+# --- RIGHT SIDE: CONTROLS, MT4 STRUCTURE CHART & ONE-CLICK WATCHLIST ---
 with col_right:
-    c_title, c_pair, c_tf, c_cross, c_mute, c_test, c_btn = st.columns([1.4, 1.1, 0.9, 0.9, 0.9, 0.8, 0.7])
-    with c_title: st.markdown("<h4 style='margin:0; color:#FFFFFF;'>⚡ Forex Matrix</h4>", unsafe_allow_html=True)
-    with c_pair: symbol = st.selectbox("Pair", pair_list, index=0, label_visibility="collapsed")
+    c_title, c_pair, c_tf, c_cross, c_mute, c_test, c_btn = st.columns([1.4, 1.2, 0.8, 0.8, 0.8, 0.7, 0.6])
+    
+    with c_title: 
+        st.markdown("<h4 style='margin:0; color:#FFFFFF;'>⚡ Forex Matrix</h4>", unsafe_allow_html=True)
+    
+    with c_pair:
+        curr_idx = pair_list.index(st.session_state["selected_pair"]) if st.session_state["selected_pair"] in pair_list else 0
+        symbol = st.selectbox("Pair", pair_list, index=curr_idx, key="pair_select", label_visibility="collapsed")
+        st.session_state["selected_pair"] = symbol
+
     with c_tf: timeframe = st.selectbox("TF", ["15m", "30m", "1h", "4h"], index=0, label_visibility="collapsed")
     with c_cross: crosshair_enabled = st.toggle("🎯 Cross", value=False)
     with c_mute: alarm_muted = st.toggle("🔕 Mute", value=False)
@@ -107,41 +118,47 @@ with col_right:
         trigger_escalating_alarm(True, test_mode=True)
 
     try:
-        df = fetch_data(symbol, timeframe)
+        df = fetch_data(st.session_state["selected_pair"], timeframe)
         struct_info = analyze_market_structure(df)
 
         st.markdown(f"""
             <div style="background-color: #1E1E1E; padding: 4px 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: white; font-weight: bold; font-size: 13px;">MT4 Structure: {symbol.replace('=X','')} ({timeframe})</span>
+                <span style="color: white; font-weight: bold; font-size: 13px;">MT4 Structure: {st.session_state['selected_pair'].replace('=X','')} ({timeframe})</span>
                 <span style="color: {struct_info['color']}; font-weight: bold; font-size: 13px;">{struct_info['status']}</span>
             </div>
         """, unsafe_allow_html=True)
 
         if struct_info['signal_alert'] and not alarm_muted:
-            st.warning(f"🚨 ALERT: Adam Koo {struct_info['status']} EMA Bounce on {symbol.replace('=X','')}!")
+            st.warning(f"🚨 ALERT: Adam Koo {struct_info['status']} EMA Bounce on {st.session_state['selected_pair'].replace('=X','')}!")
             trigger_escalating_alarm(True, test_mode=False)
 
         fig_mt4 = render_mt4_structure_chart(df, struct_info, show_crosshair=crosshair_enabled)
         st.plotly_chart(fig_mt4, use_container_width=True, config={'displayModeBar': False})
 
-        # --- MULTI-PAIR WATCHLIST FEED (Displayed Below Chart) ---
-        st.markdown("<p style='margin:0; padding:2px 0 0 0; color:#AAAAAA; font-size:11px;'><b>Active Patterns Across Market Watchlist:</b></p>", unsafe_allow_html=True)
+        # --- ONE-CLICK WATCHLIST SWITCH BUTTONS ---
+        st.markdown("<p style='margin:0; padding:2px 0 0 0; color:#AAAAAA; font-size:11px;'><b>Active Patterns (Click button to switch entire view):</b></p>", unsafe_allow_html=True)
         
-        active_patterns = []
+        active_found = False
+        feed_cols = st.columns(len(pair_list) - 1)
+        col_i = 0
+
         for p in pair_list:
-            if p != symbol:
+            if p != st.session_state["selected_pair"]:
                 try:
                     p_df = fetch_data(p, timeframe)
                     p_info = analyze_market_structure(p_df)
                     if p_info['status'] != "CHOPPY / NO TREND":
+                        active_found = True
                         clean_p = p.replace("=X", "")
-                        active_patterns.append(f"<span style='color:{p_info['color']}; font-weight:bold; padding-right:12px;'>• {clean_p}: {p_info['status']}</span>")
+                        with feed_cols[col_i]:
+                            if st.button(f"{clean_p}", key=f"btn_{p}"):
+                                st.session_state["selected_pair"] = p
+                                st.rerun()
+                        col_i += 1
                 except Exception:
                     continue
         
-        if active_patterns:
-            st.markdown(f"<div style='background-color:#111111; padding:4px; border-radius:4px; font-size:11px;'>{' '.join(active_patterns)}</div>", unsafe_allow_html=True)
-        else:
+        if not active_found:
             st.markdown("<div style='background-color:#111111; padding:4px; border-radius:4px; font-size:11px; color:#666666;'>No active trend patterns detected in other watchlist pairs right now.</div>", unsafe_allow_html=True)
 
     except Exception as e:
@@ -149,7 +166,7 @@ with col_right:
 
 # --- LEFT SIDE: 9-PANEL PREDICTION MATRIX ---
 with col_left:
-    st.markdown("<p style='margin:0; padding:0; color:#AAAAAA; font-size:12px;'><b>9-Panel Forecast Matrix</b></p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='margin:0; padding:0; color:#AAAAAA; font-size:12px;'><b>9-Panel Forecast Matrix: {st.session_state['selected_pair'].replace('=X','')}</b></p>", unsafe_allow_html=True)
     indicators = [
         ("Moving Averages", "MA"), ("Fibonacci Retracement", "FIB"), ("RSI Momentum", "RSI"),
         ("Bollinger Bands", "BOLL"), ("MACD Oscillator", "MACD"), ("Supertrend Indicator", "SUPERTREND"),
