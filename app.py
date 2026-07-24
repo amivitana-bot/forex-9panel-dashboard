@@ -24,29 +24,33 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 2. Audio Alarm Component (Escalating Sound)
-def trigger_escalating_alarm(active):
+# 2. Audio Alarm Component (Web Audio API)
+def trigger_escalating_alarm(active, test_mode=False):
     if active:
-        js_code = """
+        max_beeps = 5 if test_mode else 999
+        js_code = f"""
         <script>
-        if (!window.audioCtx) {
+        if (!window.audioCtx) {{
             window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (!window.alarmInterval) {
-            let vol = 0.05;
-            window.alarmInterval = setInterval(() => {
-                let osc = window.audioCtx.createOscillator();
-                let gain = window.audioCtx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(880, window.audioCtx.currentTime);
-                gain.gain.setValueAtTime(vol, window.audioCtx.currentTime);
-                osc.connect(gain);
-                gain.connect(window.audioCtx.destination);
-                osc.start();
-                osc.stop(window.audioCtx.currentTime + 0.15);
-                if (vol < 0.5) vol += 0.05;
-            }, 800);
-        }
+        }}
+        let vol = 0.05;
+        let count = 0;
+        let alarmInterval = setInterval(() => {{
+            let osc = window.audioCtx.createOscillator();
+            let gain = window.audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, window.audioCtx.currentTime); // 880 Hz tone
+            gain.gain.setValueAtTime(vol, window.audioCtx.currentTime);
+            osc.connect(gain);
+            gain.connect(window.audioCtx.destination);
+            osc.start();
+            osc.stop(window.audioCtx.currentTime + 0.15);
+            if (vol < 0.4) vol += 0.05; // Escalating volume
+            count++;
+            if (count >= {max_beeps}) {{
+                clearInterval(alarmInterval);
+            }}
+        }}, 600);
         </script>
         """
         components.html(js_code, height=0, width=0)
@@ -89,13 +93,18 @@ col_left, col_right = st.columns([1.3, 1])
 
 # --- RIGHT SIDE: CONTROLS & MT4 LIVE STRUCTURE CHART ---
 with col_right:
-    c_title, c_pair, c_tf, c_cross, c_mute, c_btn = st.columns([1.5, 1.2, 1, 1, 1, 0.8])
+    c_title, c_pair, c_tf, c_cross, c_mute, c_test, c_btn = st.columns([1.4, 1.1, 0.9, 0.9, 0.9, 0.8, 0.7])
     with c_title: st.markdown("<h4 style='margin:0; color:#FFFFFF;'>⚡ Forex Matrix</h4>", unsafe_allow_html=True)
     with c_pair: symbol = st.selectbox("Pair", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X"], index=0, label_visibility="collapsed")
     with c_tf: timeframe = st.selectbox("TF", ["15m", "30m", "1h", "4h"], index=0, label_visibility="collapsed")
-    with c_cross: crosshair_enabled = st.toggle("🎯 Crosshair", value=False)
+    with c_cross: crosshair_enabled = st.toggle("🎯 Cross", value=False)
     with c_mute: alarm_muted = st.toggle("🔕 Mute", value=False)
+    with c_test: test_sound = st.button("🔊 Test")
     with c_btn: refresh = st.button("🔄")
+
+    # If user clicks "🔊 Test", play sample escalating tone (5 beeps)
+    if test_sound:
+        trigger_escalating_alarm(True, test_mode=True)
 
     try:
         df = fetch_data(symbol, timeframe)
@@ -109,10 +118,10 @@ with col_right:
             </div>
         """, unsafe_allow_html=True)
 
-        # Trigger Escalating Alarm if Bounce detected
+        # Trigger Escalating Alarm if Bounce detected and not muted
         if struct_info['signal_alert'] and not alarm_muted:
             st.warning(f"🚨 ALERT: Adam Koo {struct_info['status']} EMA Bounce on {symbol.replace('=X','')}!")
-            trigger_escalating_alarm(True)
+            trigger_escalating_alarm(True, test_mode=False)
 
         # Render MT4 Live Structure Chart
         fig_mt4 = render_mt4_structure_chart(df, struct_info, show_crosshair=crosshair_enabled)
