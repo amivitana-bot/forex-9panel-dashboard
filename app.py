@@ -31,7 +31,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 2. Header & Controls
-col_title, col_pair, col_tf, col_btn = st.columns([2, 1.5, 1.5, 1])
+col_title, col_pair, col_tf, col_cross, col_btn = st.columns([2, 1.5, 1.5, 1.2, 1])
 
 with col_title:
     st.markdown("<h3 style='margin:0; padding:0; color:#FFFFFF;'>⚡ Forex Matrix</h3>", unsafe_allow_html=True)
@@ -41,6 +41,10 @@ with col_pair:
 
 with col_tf:
     timeframe = st.selectbox("TF", ["15m", "30m", "1h", "4h"], index=0, label_visibility="collapsed")
+
+with col_cross:
+    # Crosshair ON/OFF Toggle
+    crosshair_enabled = st.toggle("🎯 Crosshair", value=False)
 
 with col_btn:
     refresh = st.button("🔄 Refresh")
@@ -127,7 +131,7 @@ try:
     for idx, (title, code) in enumerate(indicators):
         col = grid[idx // 3][idx % 3]
         pred_fast, pred_slow = generate_dual_forecast(df, code)
-        fig = render_panel_chart(df, pred_fast, pred_slow, title)
+        fig = render_panel_chart(df, pred_fast, pred_slow, title, show_crosshair=crosshair_enabled)
         
         with col:
             st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
