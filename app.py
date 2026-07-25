@@ -205,13 +205,13 @@ with tab_gallery:
     auto_cleanup_old_snapshots(max_days=30)
     
     snapshot_dir = "trade_snapshots"
-    if os.path.exists(snapshot_dir):
-        files = [f for f in os.listdir(snapshot_dir) if f.endswith('.png')]
-        if files:
-            for fname in reversed(files):
-                img_path = os.path.join(snapshot_dir, fname)
-                st.image(img_path, caption=fname, use_container_width=True)
-        else:
-            st.info("No snapshots generated yet. Click the '📸 Snap' button on the Live Trading tab to generate a test snapshot.")
+    if not os.path.exists(snapshot_dir):
+        os.makedirs(snapshot_dir)
+
+    files = [f for f in os.listdir(snapshot_dir) if f.endswith('.png')]
+    if files:
+        for fname in reversed(files):
+            img_path = os.path.join(snapshot_dir, fname)
+            st.image(img_path, caption=fname, use_container_width=True)
     else:
-        st.info("No snapshots directory found.")
+        st.info("No snapshots generated yet. Go to the 'Live Trading Matrix' tab and click '📸 Snap' to test!")
