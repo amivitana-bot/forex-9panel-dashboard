@@ -2,7 +2,7 @@ import plotly.graph_objects as go
 import pandas as pd
 
 def render_panel_chart(df, pred_fast, pred_slow, title, show_crosshair=False):
-   fig = go.Figure()
+    fig = go.Figure()
 
     # 1. Main Candlesticks
     fig.add_trace(go.Candlestick(
@@ -41,96 +41,6 @@ def render_panel_chart(df, pred_fast, pred_slow, title, show_crosshair=False):
             y=[last_close, pred_slow, pred_slow],
             mode='lines',
             line=dict(color='#FFEA00', width=2, dash='dash'),
-            showlegend=False
-        )) 
-
-    # 2. Add Cyan & Yellow Forecast Rays
-    if pred_fast is not None and pred_slow is not None:
-        last_time = df.index[-1]
-        last_close = float(df['Close'].iloc[-1])
-        step = df.index[-1] - df.index[-2] if len(df) > 1 else pd.Timedelta(minutes=15)
-
-        t1 = last_time + step
-        t2 = last_time + (step * 3)
-
-        # Fast Ray (Cyan)
-        fig.add_trace(go.Scatter(
-            x=[last_time, t1, t2],
-            y=[last_close, pred_fast, pred_fast],
-            mode='lines+markers',
-            line=dict(color='#00E5FF', width=2, dash='dot'),
-            marker=dict(size=4, color='#00E5FF'),
-            showlegend=False
-        ))
-
-        # Slow Ray (Yellow)
-        fig.add_trace(go.Scatter(
-            x=[last_time, t1, t2],
-            y=[last_close, pred_slow, pred_slow],
-            mode='lines',
-            line=dict(color='#FFEA00', width=2, dash='dash'),
-            showlegend=False
-        ))
-
-    # 2. Add Cyan & Yellow Forecast Rays
-    if pred_fast is not None and pred_slow is not None:
-        last_time = df.index[-1]
-        last_close = float(df['Close'].iloc[-1])
-        step = df.index[-1] - df.index[-2] if len(df) > 1 else pd.Timedelta(minutes=15)
-
-        t1 = last_time + step
-        t2 = last_time + (step * 3)
-
-        # Fast Ray (Cyan)
-        fig.add_trace(go.Scatter(
-            x=[last_time, t1, t2],
-            y=[last_close, pred_fast, pred_fast],
-            mode='lines+markers',
-            line=dict(color='#00E5FF', width=2, dash='dot'),
-            marker=dict(size=4, color='#00E5FF'),
-            showlegend=False
-        ))
-
-        # Slow Ray (Yellow)
-        fig.add_trace(go.Scatter(
-            x=[last_time, t1, t2],
-            y=[last_close, pred_slow, pred_slow],
-            mode='lines',
-            line=dict(color='#FFEA00', width=2, dash='dash'),
-            showlegend=False
-        ))
-    # 2. Add Forecast Lines
-    if pred_fast is not None and pred_slow is not None:
-        last_time = df.index[-1]
-        last_close = df['Close'].iloc[-1]
-
-        # Generate future time steps based on index spacing
-        if len(df) > 1:
-            step = df.index[-1] - df.index[-2]
-        else:
-            step = pd.Timedelta(minutes=15)
-
-        t1 = last_time + step
-        t2 = last_time + (step * 3)
-
-        # Fast Forecast Ray (Cyan)
-        fig.add_trace(go.Scatter(
-            x=[last_time, t1, t2],
-            y=[last_close, pred_fast, pred_fast],
-            mode='lines+markers',
-            line=dict(color='#00E5FF', width=2, dash='dot'),
-            marker=dict(size=4, color='#00E5FF'),
-            name='Fast Forecast',
-            showlegend=False
-        ))
-
-        # Slow Forecast Ray (Yellow)
-        fig.add_trace(go.Scatter(
-            x=[last_time, t1, t2],
-            y=[last_close, pred_slow, pred_slow],
-            mode='lines',
-            line=dict(color='#FFEA00', width=2, dash='dash'),
-            name='Slow Forecast',
             showlegend=False
         ))
 
