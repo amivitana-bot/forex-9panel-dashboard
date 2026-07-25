@@ -3,15 +3,10 @@ from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import pandas as pd
 
-def generate_mt4_snapshot(df, trade_info, output_dir="trade_snapshots"):
+def generate_mt4_snapshot(df, trade_info):
     """
-    Generates a dark-mode, MT4-style trade snapshot optimized for ultra-wide displays.
-    Saves image as PNG with precise price/date labels, entry arrow, SL, and TP lines.
+    Generates a dark-mode, MT4-style trade snapshot figure optimized for ultra-wide displays.
     """
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    # 1. Base Candlestick Chart (MT4 Classic Colors)
     fig = go.Figure(data=[
         go.Candlestick(
             x=df.index,
@@ -27,7 +22,7 @@ def generate_mt4_snapshot(df, trade_info, output_dir="trade_snapshots"):
         )
     ])
 
-    # 2. Add Trade Annotations (Entry Arrow, SL & TP Lines)
+    # Trade Annotations (Entry Arrow, SL & TP Lines)
     entry_time = trade_info['entry_time']
     entry_price = trade_info['entry_price']
     trade_type = trade_info['type']  # 'BUY' or 'SELL'
@@ -71,7 +66,7 @@ def generate_mt4_snapshot(df, trade_info, output_dir="trade_snapshots"):
         annotation_font=dict(color="#00FF00", size=11)
     )
 
-    # 3. Apply Pitch-Black MT4 Terminal Layout Styling
+    # Pitch-Black MT4 Terminal Layout Styling
     symbol_name = trade_info.get('pair', 'AUDJPYmicro').replace('=X', '')
     tf_name = trade_info.get('timeframe', 'M15')
     last_close = df['Close'].iloc[-1]
@@ -106,24 +101,11 @@ def generate_mt4_snapshot(df, trade_info, output_dir="trade_snapshots"):
             side='right'
         ),
         showlegend=False,
-        width=1920,
-        height=824
+        height=650
     )
 
-    # Save to disk
-    filename = f"{output_dir}/trade_{trade_info['id']}_{symbol_name}.png"
-    fig.write_image(filename)
-    return filename
+    return fig
 
-def auto_cleanup_old_snapshots(output_dir="trade_snapshots", max_days=30):
-    """
-    Deletes snapshot PNG files older than 30 days to save cloud space.
-    """
-    now = datetime.now()
-    if os.path.exists(output_dir):
-        for filename in os.listdir(output_dir):
-            file_path = os.path.join(output_dir, filename)
-            if os.path.isfile(file_path) and filename.endswith('.png'):
-                file_time = datetime.fromtimestamp(os.path.getmtime(file_path))
-                if now - file_time > timedelta(days=max_days):
-                    os.remove(file_path)
+def auto_cleanup_old_snapshots():
+    """No-op helper retained for compatibility."""
+    pass
