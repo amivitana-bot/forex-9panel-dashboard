@@ -8,7 +8,7 @@ import streamlit.components.v1 as components
 from core_predictor import generate_dual_forecast
 from chart_widgets import render_panel_chart, render_mt4_structure_chart
 from structure_scanner import analyze_market_structure
-from snapshot_generator import generate_mt4_snapshot, auto_cleanup_old_snapshots
+from snapshot_generator import generate_mt4_snapshot
 
 st.set_page_config(page_title="Forex Confirmation Matrix & MT4 Structure", layout="wide", initial_sidebar_state="collapsed")
 
@@ -31,36 +31,8 @@ pair_list = ["USDJPY=X", "EURJPY=X", "GBPJPY=X", "AUDJPY=X", "EURUSD=X", "GBPUSD
 if "selected_pair" not in st.session_state:
     st.session_state["selected_pair"] = "USDJPY=X"
 
-# Web Audio API Escalating Alarm Component
-def trigger_escalating_alarm(active, test_mode=False):
-    if active:
-        max_beeps = 5 if test_mode else 999
-        js_code = f"""
-        <script>
-        if (!window.audioCtx) {{
-            window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }}
-        let vol = 0.05;
-        let count = 0;
-        let alarmInterval = setInterval(() => {{
-            let osc = window.audioCtx.createOscillator();
-            let gain = window.audioCtx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(880, window.audioCtx.currentTime);
-            gain.gain.setValueAtTime(vol, window.audioCtx.currentTime);
-            osc.connect(gain);
-            gain.connect(window.audioCtx.destination);
-            osc.start();
-            osc.stop(window.audioCtx.currentTime + 0.15);
-            if (vol < 0.4) vol += 0.05;
-            count++;
-            if (count >= {max_beeps}) {{
-                clearInterval(alarmInterval);
-            }}
-        }}, 600);
-        </script>
-        """
-        components.html(js_code, height=0, width=0)
+if "saved_snapshots" not in st.session_state:
+    st.session_state["saved_snapshots"] = []
 
 tf_config = {
     "15m": {"interval": "15m", "periods": ["1mo", "5d", "7d"]},
@@ -95,13 +67,13 @@ def fetch_data(ticker, tf):
 
     return data.tail(60)
 
-# Create Main Tabs to support trade gallery without breaking main view
+# Create Main Tabs
 tab_live, tab_gallery = st.tabs(["⚡ Live Trading Matrix", "📸 Trade Snapshot Gallery"])
 
 with tab_live:
     col_left, col_right = st.columns([1.3, 1])
 
-    # --- RIGHT SIDE: CONTROLS, MT4 STRUCTURE CHART & SNAPSHOT TEST ---
+    # --- RIGHT SIDE: CONTROLS & MT4 STRUCTURE CHART ---
     with col_right:
         c_title, c_pair, c_tf, c_cross, c_snap, c_btn = st.columns([1.4, 1.2, 0.8, 0.8, 0.9, 0.6])
         
@@ -132,7 +104,7 @@ with tab_live:
             # Generate Snapshot Test
             if test_snapshot_btn:
                 sample_trade = {
-                    "id": "101",
+                    "id": len(st.session_state["saved_snapshots"]) + 101,
                     "pair": st.session_state["selected_pair"],
                     "timeframe": timeframe,
                     "type": "BUY",
@@ -141,14 +113,18 @@ with tab_live:
                     "sl": float(df['Low'].iloc[-10]),
                     "tp": float(df['High'].iloc[-1] * 1.002)
                 }
-                saved_file = generate_mt4_snapshot(df, sample_trade)
-                st.success(f"Generated test MT4 snapshot! Check 'Trade Snapshot Gallery' tab.")
+                fig_snap = generate_mt4_snapshot(df, sample_trade)
+                st.session_state["saved_snapshots"].append({
+                    "title": f"Trade #{sample_trade['id']} - {st.session_state['selected_pair'].replace('=X','')}",
+                    "fig": fig_snap
+                })
+                st.success("Generated test MT4 snapshot! Check 'Trade Snapshot Gallery' tab.")
 
             fig_mt4 = render_mt4_structure_chart(df, struct_info, show_crosshair=crosshair_enabled)
             st.plotly_chart(fig_mt4, use_container_width=True, config={'displayModeBar': False})
 
-            # --- ONE-CLICK WATCHLIST SWITCH BUTTONS ---
-            st.markdown("<p style='margin:0; padding:2px 0 0 0; color:#AAAAAA; font-size:11px;'><b>Active Patterns (Click button to switch view):</b></p>", unsafe_allow_html=True)
+            # --- WATCHLIST SWITCH BUTTONS ---
+            st.markdown("<p style='margin:0; padding:2px 0 0 0; color:#AAAAAA; font-size:11px;'><b>Active Patterns:</b></p>", unsafe_allow_html=True)
             
             active_found = False
             feed_cols = st.columns(len(pair_list) - 1)
@@ -199,19 +175,12 @@ with tab_live:
         except Exception as e:
             st.error(f"Matrix load error: {e}")
 
-# --- TAB 2: TRADE GALLERY & AUTO-CLEANUP REVIEW ---
+# --- TAB 2: TRADE GALLERY REVIEW ---
 with tab_gallery:
     st.markdown("### 📸 Generated MT4 Trade Snapshots")
-    auto_cleanup_old_snapshots(max_days=30)
-    
-    snapshot_dir = "trade_snapshots"
-    if not os.path.exists(snapshot_dir):
-        os.makedirs(snapshot_dir)
-
-    files = [f for f in os.listdir(snapshot_dir) if f.endswith('.png')]
-    if files:
-        for fname in reversed(files):
-            img_path = os.path.join(snapshot_dir, fname)
-            st.image(img_path, caption=fname, use_container_width=True)
+    if st.session_state["saved_snapshots"]:
+        for snap in reversed(st.session_state["saved_snapshots"]):
+            st.markdown(f"#### {snap['title']}")
+            st.plotly_chart(snap["fig"], use_container_width=True)
     else:
         st.info("No snapshots generated yet. Go to the 'Live Trading Matrix' tab and click '📸 Snap' to test!")
