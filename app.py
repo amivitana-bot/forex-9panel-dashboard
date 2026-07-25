@@ -217,3 +217,47 @@ with tab_gallery:
             st.plotly_chart(snap["fig"], use_container_width=True)
     else:
         st.info("No snapshots generated yet. Go to the 'Live Trading Matrix' tab and click '📸 Snap' to test!")
+        # --- ADAM KHOO PRINCIPLE PERFORMANCE TRACKER ---
+    st.markdown("---")
+    st.markdown("### 📊 Adam Khoo Principle Performance Indicator")
+
+    # Extract performance metrics from active trades
+    trades = st.session_state.get("active_trades", [])
+    
+    # Filter closed or completed trades (Mocked win/loss status)
+    total_trades = len(trades)
+    wins = sum(1 for t in trades if t.get("status") == "WIN")
+    losses = sum(1 for t in trades if t.get("status") == "LOSS")
+    
+    # Default display values if no trades are logged yet
+    win_rate = (wins / total_trades * 100) if total_trades > 0 else 0.0
+
+    # 1. Monthly Win Rate Metric Header
+    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+    col_m1.metric("Strategy Engine", "Adam Khoo Pullback")
+    col_m2.metric("Monthly Win Rate", f"{win_rate:.1f}%")
+    col_m3.metric("Total Wins", f"🟢 {wins}")
+    col_m4.metric("Total Losses", f"🔴 {losses}")
+
+    # 2. Visual Win/Loss Progress Bar
+    if total_trades > 0:
+        st.markdown(f"**Monthly Win Ratio Progress ({wins} Wins / {losses} Losses)**")
+        st.progress(win_rate / 100.0)
+    else:
+        st.info("No completed trades recorded for this month yet. Progress bar will update as trades hit SL or TP.")
+
+    # 3. Daily Breakdown Table
+    st.markdown("#### 📅 Daily Win/Loss Log")
+    if trades:
+        # Group trades by date
+        df_trades = pd.DataFrame(trades)
+        if "date_taken" in df_trades.columns:
+            daily_summary = df_trades.groupby("date_taken").agg(
+                Total_Trades=("id", "count"),
+                Wins=("status", lambda x: (x == "WIN").sum()),
+                Losses=("status", lambda x: (x == "LOSS").sum())
+            ).reset_index()
+            daily_summary["Daily Win Rate"] = (daily_summary["Wins"] / daily_summary["Total_Trades"] * 100).round(1).astype(str) + "%"
+            st.dataframe(daily_summary, use_container_width=True)
+    else:
+        st.caption("Daily trade breakdown will automatically list daily win/loss tallies here.")
