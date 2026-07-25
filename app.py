@@ -9,6 +9,7 @@ from core_predictor import generate_dual_forecast
 from chart_widgets import render_panel_chart, render_mt4_structure_chart
 from structure_scanner import analyze_market_structure
 from snapshot_generator import generate_mt4_snapshot
+from trade_executor import evaluate_and_place_trade
 
 st.set_page_config(page_title="Forex Confirmation Matrix & MT4 Structure", layout="wide", initial_sidebar_state="collapsed")
 
@@ -25,7 +26,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 1. Initialize Active Pair State
+# 1. Initialize Active States
 pair_list = ["USDJPY=X", "EURJPY=X", "GBPJPY=X", "AUDJPY=X", "EURUSD=X", "GBPUSD=X", "AUDUSD=X", "USDCAD=X"]
 
 if "selected_pair" not in st.session_state:
@@ -33,6 +34,12 @@ if "selected_pair" not in st.session_state:
 
 if "saved_snapshots" not in st.session_state:
     st.session_state["saved_snapshots"] = []
+
+if "active_trades" not in st.session_state:
+    st.session_state["active_trades"] = []
+
+if "daily_counts" not in st.session_state:
+    st.session_state["daily_counts"] = {}
 
 tf_config = {
     "15m": {"interval": "15m", "periods": ["1mo", "5d", "7d"]},
@@ -61,6 +68,12 @@ def fetch_data(ticker, tf):
 
     data.columns = [str(c).capitalize() for c in data.columns]
     data = data[['Open', 'High', 'Low', 'Close']].dropna().copy()
+
+    # Pre-calculate EMAs for Adam Khoo setup
+    data['EMA_6'] = data['Close'].ewm(span=6, adjust=False).mean()
+    data['EMA_18'] = data['Close'].ewm(span=18, adjust=False).mean()
+    data['EMA_50'] = data['Close'].ewm(span=50, adjust=False).mean()
+    data['EMA_200'] = data['Close'].ewm(span=200, adjust=False).mean()
 
     if tf == "4h":
         data = data.resample('4h').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last'}).dropna()
@@ -101,24 +114,41 @@ with tab_live:
                 </div>
             """, unsafe_allow_html=True)
 
-            # Generate Snapshot Test
+            # Manual Test Snapshot Button
             if test_snapshot_btn:
-                sample_trade = {
-                    "id": len(st.session_state["saved_snapshots"]) + 101,
-                    "pair": st.session_state["selected_pair"],
-                    "timeframe": timeframe,
-                    "type": "BUY",
-                    "entry_time": df.index[-5],
-                    "entry_price": float(df['Close'].iloc[-5]),
-                    "sl": float(df['Low'].iloc[-10]),
-                    "tp": float(df['High'].iloc[-1] * 1.002)
-                }
-                fig_snap = generate_mt4_snapshot(df, sample_trade)
-                st.session_state["saved_snapshots"].append({
-                    "title": f"Trade #{sample_trade['id']} - {st.session_state['selected_pair'].replace('=X','')}",
-                    "fig": fig_snap
-                })
-                st.success("Generated test MT4 snapshot! Check 'Trade Snapshot Gallery' tab.")
+                trade_result = evaluate_and_place_trade(
+                    df, st.session_state["selected_pair"], timeframe,
+                    st.session_state["active_trades"], st.session_state["daily_counts"]
+                )
+                
+                if trade_result and trade_result.get("id") == "DAILY_CAP_REACHED":
+                    st.warning("⚠️ Daily cap of 3 trades reached for today. System paused taking new trades.")
+                elif trade_result:
+                    st.session_state["active_trades"].append(trade_result)
+                    fig_snap = generate_mt4_snapshot(df, trade_result)
+                    st.session_state["saved_snapshots"].append({
+                        "title": f"Trade #{trade_result['id']} - {trade_result['type']} {st.session_state['selected_pair'].replace('=X','')}",
+                        "fig": fig_snap
+                    })
+                    st.success(f"Executed paper trade! Visual saved to 'Trade Snapshot Gallery'.")
+                else:
+                    # If no natural setup exists, generate mock sample
+                    sample_trade = {
+                        "id": f"TEST_{len(st.session_state['saved_snapshots']) + 1}",
+                        "pair": st.session_state["selected_pair"],
+                        "timeframe": timeframe,
+                        "type": "BUY",
+                        "entry_time": df.index[-5],
+                        "entry_price": float(df['Close'].iloc[-5]),
+                        "sl": float(df['Low'].iloc[-10]),
+                        "tp": float(df['High'].iloc[-1] * 1.002)
+                    }
+                    fig_snap = generate_mt4_snapshot(df, sample_trade)
+                    st.session_state["saved_snapshots"].append({
+                        "title": f"Test Snapshot - {st.session_state['selected_pair'].replace('=X','')}",
+                        "fig": fig_snap
+                    })
+                    st.info("No natural Adam Khoo pullback setup active right now. Generated test MT4 snapshot in Gallery.")
 
             fig_mt4 = render_mt4_structure_chart(df, struct_info, show_crosshair=crosshair_enabled)
             st.plotly_chart(fig_mt4, use_container_width=True, config={'displayModeBar': False})
