@@ -31,17 +31,17 @@ def generate_mt4_snapshot(df, trade_info):
 
     arrow_color = '#00FF00' if trade_type == 'BUY' else '#FF0000'
     arrow_symbol = 'triangle-up' if trade_type == 'BUY' else 'triangle-down'
-
-    # Entry Marker Arrow
+# Entry Marker Arrow (Overlay directly on main chart)
     fig.add_trace(go.Scatter(
         x=[entry_time],
         y=[entry_price],
         mode='markers+text',
-        marker=dict(symbol=arrow_symbol, size=16, color=arrow_color),
+        marker=dict(symbol=arrow_symbol, size=14, color=arrow_color),
         text=[f"  {trade_type} @ {entry_price:.3f}"],
         textposition="middle right",
-        textfont=dict(color="#FFFFFF", size=12),
-        name="Entry Point"
+        textfont=dict(color="#FFFFFF", size=11),
+        showlegend=False
+
     ))
 
     # Dotted SL Line (Red)
