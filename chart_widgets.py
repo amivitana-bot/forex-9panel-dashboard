@@ -2,27 +2,62 @@ import plotly.graph_objects as go
 import pandas as pd
 
 def render_panel_chart(df, pred_fast, pred_slow, title, show_crosshair=False):
-    fig = go.Figure(data=[
-        go.Candlestick(
-            x=df.index,
-            open=df['Open'],
-            high=df['High'],
-            low=df['Low'],
-            close=df['Close'],
-            increasing_line_color='#26a69a',
-            decreasing_line_color='#ef5350',
-            showlegend=False
-        )
-    ])
+    fig = go.Figure()
 
-    # Slim, Sleek Crosshair Settings
+    # 1. Main Candlesticks
+    fig.add_trace(go.Candlestick(
+        x=df.index,
+        open=df['Open'],
+        high=df['High'],
+        low=df['Low'],
+        close=df['Close'],
+        increasing_line_color='#26a69a',
+        decreasing_line_color='#ef5350',
+        showlegend=False
+    ))
+
+    # 2. Prediction Lines Projection
+    if pred_fast is not None and pred_slow is not None:
+        last_time = df.index[-1]
+        
+        # Calculate future timestamps for projection
+        if len(df) > 1:
+            time_diff = df.index[-1] - df.index[-2]
+        else:
+            time_diff = pd.Timedelta(minutes=15)
+            
+        future_time_1 = last_time + time_diff
+        future_time_2 = last_time + (time_diff * 3)
+
+        # Fast Forecast Ray (Cyan)
+        fig.add_trace(go.Scatter(
+            x=[last_time, future_time_1, future_time_2],
+            y=[df['Close'].iloc[-1], pred_fast, pred_fast],
+            mode='lines+markers',
+            line=dict(color='#00E5FF', width=1.5, dash='dot'),
+            marker=dict(size=4),
+            name='Fast Forecast',
+            showlegend=False
+        ))
+
+        # Slow Forecast Ray (Yellow)
+        fig.add_trace(go.Scatter(
+            x=[last_time, future_time_1, future_time_2],
+            y=[df['Close'].iloc[-1], pred_slow, pred_slow],
+            mode='lines',
+            line=dict(color='#FFEA00', width=1.5, dash='dash'),
+            name='Slow Forecast',
+            showlegend=False
+        ))
+
+    # Slim, Sleek Crosshairs
     spike_kwargs = dict(
         showspikes=show_crosshair,
         spikemode='across',
         spikesnap='cursor',
         spikecolor='#777777',
-        spikethickness=1,       # Ultra-thin line
-        spikedash='dot'         # Fine dotted line
+        spikethickness=1,
+        spikedash='dot'
     )
 
     fig.update_layout(
@@ -77,7 +112,7 @@ def render_mt4_structure_chart(df, struct_info, show_crosshair=False):
         spikemode='across',
         spikesnap='cursor',
         spikecolor='#AAAAAA',
-        spikethickness=1,       # Thin 1px stroke
+        spikethickness=1,
         spikedash='dot'
     )
 
