@@ -27,7 +27,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 1. Initialize Active States
-pair_list = ["USDJPY=X", "EURJPY=X", "GBPJPY=X", "AUDJPY=X", "EURUSD=X", "GBPUSD=X", "AUDUSD=X", "USDCAD=X"]
+pair_list = [
+    "EURUSD=X", "USDJPY=X", "GBPUSD=X", "USDCHF=X", 
+    "AUDUSD=X", "USDCAD=X", "NZDUSD=X", "EURJPY=X", "GBPJPY=X"
+]
 
 if "selected_pair" not in st.session_state:
     st.session_state["selected_pair"] = "USDJPY=X"
